@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="500" viewBox="0 0 1440 500" role="img" aria-labelledby="title desc">
   <title id="title">JevStream ticket routing stages</title>
-  <desc id="desc">JSON flows through FastAPI and a swappable judgment adapter into a Redis urgency queue, where a leased worker claims the highest-priority ticket.</desc>
+  <desc id="desc">FastAPI validates JSON, a swappable judge returns urgency and department, Redis orders tickets by urgency, and a leased worker claims the highest-priority ticket with a per-claim token.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="#334155"/></marker>
     <style>text{font-family:Arial,sans-serif;fill:#172033}.stage{font-size:18px;font-weight:700}.name{font-size:25px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#475569}</style>
@@ -33,8 +33,8 @@
   <text x="985" y="340" text-anchor="middle" class="small">Highest score first</text>
   <text x="1280" y="195" text-anchor="middle" class="stage" fill="#7e3fa1">STAGE 4</text>
   <text x="1280" y="240" text-anchor="middle" class="name">Workers</text>
-  <text x="1280" y="285" text-anchor="middle" class="body">Atomic Lua claim</text>
-  <text x="1280" y="320" text-anchor="middle" class="body">Expiring lease</text>
+  <text x="1280" y="285" text-anchor="middle" class="body">Atomic Lua claim + token</text>
+  <text x="1280" y="320" text-anchor="middle" class="body">Redis-time lease deadline</text>
   <path d="M200 265h47 M485 265h52 M805 265h52 M1105 265h52" fill="none" stroke="#334155" stroke-width="4" marker-end="url(#arrow)"/>
   <text x="720" y="445" text-anchor="middle" class="small">Worker routing is currently simulated; downstream automation and human triage are not connected.</text>
 </svg>

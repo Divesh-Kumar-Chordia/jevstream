@@ -27,15 +27,16 @@ flowchart LR
   end
 
   subgraph Redis["Queue and state (Redis)"]
-    Active["Active priority ZSET<br/>score = urgency"]
+    Active["Active priority ZSET<br/>score = urgency 0.0-1.0"]
     Payload["Payload HASH<br/>ticket ID to serialized ticket"]
-    Processing["Processing ZSET<br/>score = lease deadline"]
+    Processing["Processing ZSET<br/>score = Unix-ms lease deadline"]
+    LeaseTokens["Lease-token HASH<br/>jevstream:leases"]
   end
 
   subgraph Workers["Worker tier"]
     Pool["Async worker pool"]
     Recover["Recover expired leases"]
-    Claim["Claim highest urgency"]
+    Claim["Claim highest urgency<br/>Atomic Lua + Redis TIME"]
     Route["Route decision<br/>currently logged, not executed"]
     Ack["Acknowledge completed ticket"]
     Retry["Requeue failed ticket"]
@@ -55,11 +56,13 @@ flowchart LR
 
   Pool --> Recover
   Processing -->|expired claim| Recover
+  LeaseTokens -->|clear expired token| Recover
   Recover -->|restore priority| Active
   Pool --> Claim
   Active -->|highest score| Claim
   Payload -->|ticket data| Claim
-  Claim -->|set lease| Processing
+  Claim -->|set Unix-ms deadline| Processing
+  Claim -->|store per-claim token| LeaseTokens
   Claim --> Pool
   Pool --> Route
   Route -.->|future integration| Automation
@@ -67,8 +70,10 @@ flowchart LR
   Route -->|success| Ack
   Ack -->|remove lease and payload| Processing
   Ack -->|remove payload| Payload
+  Ack -->|remove claim token| LeaseTokens
   Route -->|failure| Retry
   Retry -->|restore priority| Active
+  Retry -->|clear claim token| LeaseTokens
 ```
 
 The active ZSET score is urgency; the processing ZSET score is a lease deadline in Unix epoch milliseconds, computed with Redis `TIME`. Atomic Lua scripts handle enqueue, claim, acknowledgement, retry, and expired-claim recovery. Per-claim tokens prevent a stale worker from acknowledging or requeueing a newer claim. Lease expiry provides at-least-once recovery, not exactly-once execution: if a handler outlives its lease, a retry may run while the original handler is still active. Downstream handlers must be idempotent to prevent duplicate side effects.

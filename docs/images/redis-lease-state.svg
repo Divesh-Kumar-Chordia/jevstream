@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="720" viewBox="0 0 1440 720" role="img" aria-labelledby="title desc">
-  <title id="title">Redis queue states and worker lease</title>
-  <desc id="desc">A ticket moves atomically from the active urgency ZSET to a processing ZSET whose score is the lease deadline in Unix milliseconds. The payload hash supports retry and crash recovery.</desc>
+  <title id="title">Redis active and processing queue lease states</title>
+  <desc id="desc">An atomic worker claim moves a ticket from the urgency-scored active ZSET to a processing ZSET scored by a Redis-time lease deadline and associates a per-claim token.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="#334155"/></marker>
     <style>text{font-family:Arial,sans-serif;fill:#172033}.head{font-size:24px;font-weight:700}.item{font-size:18px;font-weight:600}.body{font-size:15px}.small{font-size:13px;fill:#475569}.label{font-size:14px;font-weight:600}</style>
@@ -22,21 +22,22 @@
 
   <rect x="520" y="175" width="400" height="250" rx="24" fill="#e8f4ff" stroke="#2186dc" stroke-width="4"/>
   <text x="720" y="222" text-anchor="middle" class="head">Atomic Lua claim</text>
-  <text x="720" y="270" text-anchor="middle" class="body">1. Read highest priority</text>
-  <text x="720" y="305" text-anchor="middle" class="body">2. Remove from active ZSET</text>
-  <text x="720" y="340" text-anchor="middle" class="body">3. Add with lease deadline</text>
+  <text x="720" y="270" text-anchor="middle" class="body">1. Read highest urgency</text>
+  <text x="720" y="305" text-anchor="middle" class="body">2. Redis TIME sets Unix-ms deadline</text>
+  <text x="720" y="340" text-anchor="middle" class="body">3. Move ticket and record token</text>
   <text x="720" y="390" text-anchor="middle" class="small">Claim transition runs as one Redis script.</text>
 
   <rect x="1035" y="125" width="350" height="350" rx="16" fill="#fff0ef" stroke="#df4747" stroke-width="4"/>
   <path d="M1035 195h350" stroke="#df4747" stroke-width="3"/>
   <text x="1210" y="168" text-anchor="middle" class="head">Processing ZSET</text>
   <text x="1210" y="225" text-anchor="middle" class="body">jevstream:processing</text>
-  <text x="1210" y="247" text-anchor="middle" class="small">score = lease deadline</text>
+  <text x="1210" y="247" text-anchor="middle" class="small">score = lease deadline (Unix ms)</text>
   <rect x="1065" y="270" width="290" height="60" rx="8" fill="#fff" stroke="#f2a0a0"/>
-  <text x="1210" y="294" text-anchor="middle" class="item">Ticket A</text>
-  <text x="1210" y="316" text-anchor="middle" class="small">Unix timestamp, milliseconds</text>
+  <text x="1210" y="294" text-anchor="middle" class="item">Ticket A | now + lease</text>
+  <text x="1210" y="316" text-anchor="middle" class="small">claim token-a</text>
   <rect x="1065" y="345" width="290" height="55" rx="8" fill="#fff" stroke="#f2a0a0"/>
-  <text x="1210" y="379" text-anchor="middle" class="item">Ticket B | deadline</text>
+  <text x="1210" y="379" text-anchor="middle" class="item">Ticket B | now + lease</text>
+  <text x="1210" y="401" text-anchor="middle" class="small">claim token-b</text>
   <text x="1210" y="445" text-anchor="middle" class="small">Expired leases can be recovered.</text>
 
   <path d="M405 300h105 M920 300h105" fill="none" stroke="#334155" stroke-width="4" marker-end="url(#arrow)"/>
