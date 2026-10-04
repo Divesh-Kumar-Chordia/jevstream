@@ -6,9 +6,11 @@ The included `mock` judge makes the project runnable locally. It is a determinis
 
 ## Core Philosophy
 
-Queue prioritization often needs a compact, validated decision rather than generated prose that another service must parse. JevStream explores that boundary: a judgment adapter returns a bounded urgency score and a department, and Redis uses the urgency as the sorted-set score for priority retrieval. Sorted-set updates and retrieval are logarithmic in the queue size; the worker uses atomic Lua scripts and expiring claims to support recovery after a worker interruption.
+For workloads that need a strict bounded score and category without a generated explanation, a structured judgment can be more useful than generated prose that another service must parse. JevStream explores that specialized pattern: a judgment adapter returns a bounded urgency score and a department, and Redis uses the urgency as the sorted-set score for priority retrieval. Sorted-set insertion and one-item priority lookup are logarithmic in queue size; the worker uses atomic Lua scripts and expiring claims to support recovery after a worker interruption.
 
-This repository is an architectural MVP, not a benchmark or a production Jev integration. The mock judge is deterministic, and the HTTP adapter accepts JevStream's own contract. Latency, provider accuracy, throughput, and production readiness depend on the configured judge, Redis deployment, and downstream handler.
+## Current Scope Caveat
+
+The default judge is deterministic keyword logic; the optional HTTP adapter uses JevStream's provider-neutral contract and is not an official TypeSafe Jev integration. No performance or latency benchmarks have been completed. `benchmark.py` is a local load generator for collecting environment-specific baseline measurements, not a published performance result.
 
 ## Architecture
 
@@ -69,7 +71,15 @@ flowchart LR
   Retry -->|restore priority| Active
 ```
 
-The ZSET score is the urgency value, so workers claim the highest score first. Lua scripts make enqueue, claim, acknowledgement, retry, and expired-claim recovery atomic. A worker crash leaves the ticket in a processing ZSET until its lease expires, after which another worker can recover it. Delivery is at least once: handlers should be idempotent if they perform external side effects.
+The active ZSET score is urgency; the processing ZSET score is a lease deadline in Unix epoch milliseconds, computed with Redis `TIME`. Atomic Lua scripts handle enqueue, claim, acknowledgement, retry, and expired-claim recovery. Per-claim tokens prevent a stale worker from acknowledging or requeueing a newer claim. Lease expiry provides at-least-once recovery, not exactly-once execution: if a handler outlives its lease, a retry may run while the original handler is still active. Downstream handlers must be idempotent to prevent duplicate side effects.
+
+### Ticket Ingestion and Priority Routing
+
+![JevStream ticket ingestion, judgment, Redis priority queue, and worker stages](docs/images/jevstream-pipeline.svg)
+
+### Redis Queue States and Worker Lease
+
+![Redis active and processing sorted sets with atomic worker claims and lease recovery](docs/images/redis-lease-state.svg)
 
 ## Run locally
 
@@ -90,6 +100,14 @@ uvicorn main:app --reload
 
 ```sh
 python worker.py
+```
+
+### Burst benchmark
+
+With Redis, the API, and a worker running, send a burst of 500 unique tickets with up to 100 concurrent requests:
+
+```sh
+python benchmark.py --requests 500 --concurrency 100
 ```
 
 ## Quickstart
@@ -129,4 +147,4 @@ This is JevStream's adapter contract, not a claim about TypeSafe's official API 
 
 ## Settings
 
-Configuration is read from environment variables or `.env`: `REDIS_URL`, `JUDGE_MODE`, `JUDGE_API_URL`, `JUDGE_API_KEY`, `JUDGE_TIMEOUT_SECONDS`, `AUTO_ROUTE_THRESHOLD`, `CLAIM_LEASE_SECONDS`, and `WORKER_POLL_INTERVAL_SECONDS`. Redis keys can be customized with `QUEUE_KEY`, `PROCESSING_KEY`, and `PAYLOAD_KEY`.
+Configuration is read from environment variables or `.env`: `REDIS_URL`, `JUDGE_MODE`, `JUDGE_API_URL`, `JUDGE_API_KEY`, `JUDGE_TIMEOUT_SECONDS`, `AUTO_ROUTE_THRESHOLD`, `CLAIM_LEASE_SECONDS`, and `WORKER_POLL_INTERVAL_SECONDS`. Redis keys can be customized with `QUEUE_KEY`, `PROCESSING_KEY`, `PAYLOAD_KEY`, and `LEASES_KEY`.

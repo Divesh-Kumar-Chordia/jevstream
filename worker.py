@@ -12,9 +12,10 @@ logger = logging.getLogger("jevstream.worker")
 
 
 async def handle(item: QueueItem, threshold: float) -> None:
+    # TODO: Downstream integrations must be idempotent to safely support at-least-once delivery.
     destination = "automation" if item.judgment.urgency >= threshold else "human"
     logger.info(
-        "Routed ticket=%s department=%s urgency=%.2f destination=%s",
+        "Routed ticket=%s department=%s urgency=%.2f destination=%s delivery=at-least-once",
         item.ticket_id,
         item.judgment.department,
         item.judgment.urgency,
@@ -33,18 +34,23 @@ async def run() -> None:
             if recovered:
                 logger.warning("Recovered %d expired ticket claim(s)", recovered)
 
-            item = await queue.claim()
-            if item is None:
+            claim = await queue.claim()
+            if claim is None:
                 await asyncio.sleep(settings.worker_poll_interval_seconds)
                 continue
 
             try:
-                await handle(item, settings.auto_route_threshold)
+                await handle(claim.item, settings.auto_route_threshold)
             except Exception:
-                logger.exception("Ticket handling failed: %s", item.ticket_id)
-                await queue.requeue(item.ticket_id)
+                logger.exception("Ticket handling failed: %s", claim.item.ticket_id)
+                if not await queue.requeue(claim.item.ticket_id, claim.token):
+                    logger.warning("Could not requeue ticket; lease is no longer owned: %s", claim.item.ticket_id)
             else:
-                await queue.acknowledge(item.ticket_id)
+                if not await queue.acknowledge(claim.item.ticket_id, claim.token):
+                    logger.warning(
+                        "Ticket lease expired or was reclaimed before acknowledgement: %s",
+                        claim.item.ticket_id,
+                    )
     finally:
         await redis.aclose()
 

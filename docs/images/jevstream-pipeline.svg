@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="500" viewBox="0 0 1440 500" role="img" aria-labelledby="title desc">
+  <title id="title">JevStream ticket routing stages</title>
+  <desc id="desc">JSON flows through FastAPI and a swappable judgment adapter into a Redis urgency queue, where a leased worker claims the highest-priority ticket.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="#334155"/></marker>
+    <style>text{font-family:Arial,sans-serif;fill:#172033}.stage{font-size:18px;font-weight:700}.name{font-size:25px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#475569}</style>
+  </defs>
+  <rect width="1440" height="500" fill="#fbfaf5"/>
+  <text x="720" y="55" text-anchor="middle" class="name">JevStream | Ticket triage pipeline</text>
+  <g stroke-width="4">
+    <rect x="45" y="160" width="155" height="210" rx="18" fill="#fff" stroke="#0f9488"/>
+    <rect x="255" y="140" width="230" height="250" rx="18" fill="#fff" stroke="#1670c5"/>
+    <rect x="545" y="140" width="260" height="250" rx="18" fill="#fff" stroke="#d92d20"/>
+    <rect x="865" y="140" width="240" height="250" rx="18" fill="#fff" stroke="#7e3fa1"/>
+    <rect x="1165" y="160" width="230" height="210" rx="18" fill="#fff" stroke="#64748b"/>
+  </g>
+  <text x="122" y="195" text-anchor="middle" class="stage" fill="#0f766e">INPUT</text>
+  <text x="122" y="265" text-anchor="middle" class="name">JSON</text>
+  <text x="122" y="310" text-anchor="middle" class="body">HTTP payload</text>
+  <text x="370" y="180" text-anchor="middle" class="stage" fill="#1670c5">STAGE 1</text>
+  <text x="370" y="225" text-anchor="middle" class="name">Ingestion</text>
+  <text x="370" y="275" text-anchor="middle" class="body">FastAPI endpoint</text>
+  <text x="370" y="310" text-anchor="middle" class="body">POST /ingest</text>
+  <text x="675" y="180" text-anchor="middle" class="stage" fill="#1670c5">STAGE 2</text>
+  <text x="675" y="225" text-anchor="middle" class="name">Judgment</text>
+  <text x="675" y="270" text-anchor="middle" class="body">Swappable adapter</text>
+  <text x="675" y="305" text-anchor="middle" class="body">Urgency: 0.0 to 1.0</text>
+  <text x="675" y="340" text-anchor="middle" class="small">Mock or configured HTTP</text>
+  <text x="985" y="180" text-anchor="middle" class="stage" fill="#c5221f">STAGE 3</text>
+  <text x="985" y="225" text-anchor="middle" class="name">Priority Queue</text>
+  <text x="985" y="270" text-anchor="middle" class="body">Redis ZSET</text>
+  <text x="985" y="305" text-anchor="middle" class="body">Score = urgency</text>
+  <text x="985" y="340" text-anchor="middle" class="small">Highest score first</text>
+  <text x="1280" y="195" text-anchor="middle" class="stage" fill="#7e3fa1">STAGE 4</text>
+  <text x="1280" y="240" text-anchor="middle" class="name">Workers</text>
+  <text x="1280" y="285" text-anchor="middle" class="body">Atomic Lua claim</text>
+  <text x="1280" y="320" text-anchor="middle" class="body">Expiring lease</text>
+  <path d="M200 265h47 M485 265h52 M805 265h52 M1105 265h52" fill="none" stroke="#334155" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="720" y="445" text-anchor="middle" class="small">Worker routing is currently simulated; downstream automation and human triage are not connected.</text>
+</svg>
