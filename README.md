@@ -12,10 +12,61 @@ This repository is an architectural MVP, not a benchmark or a production Jev int
 
 ## Architecture
 
-```text
-POST /ingest -> Judge -> Redis active ZSET -> leased worker claim
-                                      |              |
-                               ticket payload   automation/human
+```mermaid
+flowchart LR
+  subgraph Sources["Event sources"]
+    Client["Ticketing system / webhook producer"]
+  end
+
+  subgraph Ingestion["Ingestion tier"]
+    API["FastAPI API instances<br/>POST /ingest"]
+    Judge["Judge adapter<br/>deterministic mock or configured HTTP endpoint"]
+    Enqueue["Atomic Lua enqueue"]
+  end
+
+  subgraph Redis["Queue and state (Redis)"]
+    Active["Active priority ZSET<br/>score = urgency"]
+    Payload["Payload HASH<br/>ticket ID to serialized ticket"]
+    Processing["Processing ZSET<br/>score = lease deadline"]
+  end
+
+  subgraph Workers["Worker tier"]
+    Pool["Async worker pool"]
+    Recover["Recover expired leases"]
+    Claim["Claim highest urgency"]
+    Route["Route decision<br/>currently logged, not executed"]
+    Ack["Acknowledge completed ticket"]
+    Retry["Requeue failed ticket"]
+  end
+
+  subgraph Future["Future downstream integrations"]
+    Automation["Automation / remediation"]
+    Human["Human triage system"]
+  end
+
+  Client --> API
+  API <--> Judge
+  API -->|validated judgment| Enqueue
+  Enqueue -->|atomic write| Active
+  Enqueue -->|atomic write| Payload
+  API -->|202 + routing metadata| Client
+
+  Pool --> Recover
+  Processing -->|expired claim| Recover
+  Recover -->|restore priority| Active
+  Pool --> Claim
+  Active -->|highest score| Claim
+  Payload -->|ticket data| Claim
+  Claim -->|set lease| Processing
+  Claim --> Pool
+  Pool --> Route
+  Route -.->|future integration| Automation
+  Route -.->|future integration| Human
+  Route -->|success| Ack
+  Ack -->|remove lease and payload| Processing
+  Ack -->|remove payload| Payload
+  Route -->|failure| Retry
+  Retry -->|restore priority| Active
 ```
 
 The ZSET score is the urgency value, so workers claim the highest score first. Lua scripts make enqueue, claim, acknowledgement, retry, and expired-claim recovery atomic. A worker crash leaves the ticket in a processing ZSET until its lease expires, after which another worker can recover it. Delivery is at least once: handlers should be idempotent if they perform external side effects.
